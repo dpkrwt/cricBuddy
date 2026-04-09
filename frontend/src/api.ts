@@ -10,7 +10,7 @@ import type {
 } from "./types";
 
 const api = axios.create({
-  baseURL: "/api",
+  baseURL: "https://cricbuddy-backend-6zqb.onrender.com/api",
 });
 
 export const getTeams = () => api.get<TeamInfo[]>("/teams");
