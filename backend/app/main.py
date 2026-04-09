@@ -15,7 +15,11 @@ app = FastAPI(title="CricBuddy API", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:5173"],
+    allow_origins=[
+        "https://cricbuddy-backend-6zqb.onrender.com",
+        "http://localhost:3000",
+        "http://localhost:5173",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -200,7 +204,9 @@ def get_status():
     return {
         "status": "ok",
         "liveDataEnabled": cricket_api.enabled,
-        "dataSource": "CricketData.org API" if cricket_api.enabled else "Static mock data",
+        "dataSource": "CricketData.org API"
+        if cricket_api.enabled
+        else "Static mock data",
         "message": (
             "Using live cricket data"
             if cricket_api.enabled
@@ -216,7 +222,11 @@ def get_current_series():
     if not cricket_api.enabled:
         return {
             "source": "static",
-            "series": {"name": "Indian Premier League 2025", "startDate": "2025-03-22", "endDate": "2025-05-25"},
+            "series": {
+                "name": "Indian Premier League 2025",
+                "startDate": "2025-03-22",
+                "endDate": "2025-05-25",
+            },
         }
     series = cricket_api.get_latest_ipl_series()
     if not series:
@@ -228,7 +238,10 @@ def get_current_series():
 def get_series_info(series_id: str):
     """Get full series info (including match list) by series ID"""
     if not cricket_api.enabled:
-        raise HTTPException(400, "Live data is not enabled. Set USE_LIVE_DATA=true and provide an API key.")
+        raise HTTPException(
+            400,
+            "Live data is not enabled. Set USE_LIVE_DATA=true and provide an API key.",
+        )
     info = cricket_api.get_series_info(series_id)
     if not info:
         raise HTTPException(502, "Could not fetch series info")
@@ -281,7 +294,9 @@ def get_team(team_id: str):
             if cricket_api.enabled:
                 ipl_data = cricket_api.get_ipl_data()
                 if ipl_data and ipl_data.get("teams"):
-                    api_teams = {at["shortName"].upper(): at for at in ipl_data["teams"]}
+                    api_teams = {
+                        at["shortName"].upper(): at for at in ipl_data["teams"]
+                    }
                     api_t = api_teams.get(t["shortName"].upper())
                     if api_t and api_t.get("img"):
                         return {**t, "logo": api_t["img"]}
@@ -335,7 +350,8 @@ def get_live_matches():
         if current is not None:
             # Filter for truly ongoing matches only
             live = [
-                m for m in current
+                m
+                for m in current
                 if m.get("matchStarted", False) and not m.get("matchEnded", False)
             ]
             return [_normalize_api_match(m) for m in live]
@@ -359,7 +375,8 @@ def get_upcoming_matches():
         ipl_data = cricket_api.get_ipl_data()
         if ipl_data and ipl_data.get("matches"):
             upcoming = [
-                _normalize_api_match(m) for m in ipl_data["matches"]
+                _normalize_api_match(m)
+                for m in ipl_data["matches"]
                 if not m.get("matchStarted", False)
             ]
             upcoming.sort(key=lambda x: x.get("dateTimeGMT", x.get("date", "")))
@@ -483,16 +500,26 @@ def _calculate_points_table(matches: list) -> list:
     stats = {}
     for tid in team_ids:
         stats[tid] = {
-            "played": 0, "won": 0, "lost": 0, "tied": 0, "no_result": 0,
-            "runs_scored": 0, "overs_faced": 0.0,
-            "runs_conceded": 0, "overs_bowled": 0.0,
+            "played": 0,
+            "won": 0,
+            "lost": 0,
+            "tied": 0,
+            "no_result": 0,
+            "runs_scored": 0,
+            "overs_faced": 0.0,
+            "runs_conceded": 0,
+            "overs_bowled": 0.0,
         }
 
     completed = [m for m in matches if m.get("status") == "completed"]
 
     for match in completed:
-        t1_id = _SHORTNAME_TO_ID.get(match.get("team1", "").upper(), match.get("team1", ""))
-        t2_id = _SHORTNAME_TO_ID.get(match.get("team2", "").upper(), match.get("team2", ""))
+        t1_id = _SHORTNAME_TO_ID.get(
+            match.get("team1", "").upper(), match.get("team1", "")
+        )
+        t2_id = _SHORTNAME_TO_ID.get(
+            match.get("team2", "").upper(), match.get("team2", "")
+        )
 
         if t1_id not in stats or t2_id not in stats:
             continue
@@ -537,20 +564,24 @@ def _calculate_points_table(matches: list) -> list:
     for tid, s in stats.items():
         points = s["won"] * 2 + s["tied"] * 1 + s["no_result"] * 1
         if s["overs_faced"] > 0 and s["overs_bowled"] > 0:
-            nrr = (s["runs_scored"] / s["overs_faced"]) - (s["runs_conceded"] / s["overs_bowled"])
+            nrr = (s["runs_scored"] / s["overs_faced"]) - (
+                s["runs_conceded"] / s["overs_bowled"]
+            )
         else:
             nrr = 0.0
 
-        result.append({
-            "teamId": tid,
-            "played": s["played"],
-            "won": s["won"],
-            "lost": s["lost"],
-            "tied": s["tied"],
-            "noResult": s["no_result"],
-            "nrr": round(nrr, 3),
-            "points": points,
-        })
+        result.append(
+            {
+                "teamId": tid,
+                "played": s["played"],
+                "won": s["won"],
+                "lost": s["lost"],
+                "tied": s["tied"],
+                "noResult": s["no_result"],
+                "nrr": round(nrr, 3),
+                "points": points,
+            }
+        )
 
     # Sort: by points desc, then NRR desc, then wins desc
     result.sort(key=lambda x: (-x["points"], -x["nrr"], -x["won"]))
@@ -586,13 +617,15 @@ def get_points_table():
                 if api_t and api_t.get("img"):
                     logo = api_t["img"]
 
-        enriched.append({
-            **pt,
-            "teamName": team["name"],
-            "shortName": team["shortName"],
-            "color": team["color"],
-            "logo": logo,
-        })
+        enriched.append(
+            {
+                **pt,
+                "teamName": team["name"],
+                "shortName": team["shortName"],
+                "color": team["color"],
+                "logo": logo,
+            }
+        )
     return enriched
 
 
@@ -641,13 +674,15 @@ def get_members():
             team = tm.get(tid)
             if team:
                 logo = api_logo_map.get(tid, team["logo"])
-                member["topTeamsInfo"].append({
-                    "id": team["id"],
-                    "shortName": team["shortName"],
-                    "name": team["name"],
-                    "color": team["color"],
-                    "logo": logo,
-                })
+                member["topTeamsInfo"].append(
+                    {
+                        "id": team["id"],
+                        "shortName": team["shortName"],
+                        "name": team["name"],
+                        "color": team["color"],
+                        "logo": logo,
+                    }
+                )
         result.append(member)
     return result
 
@@ -707,4 +742,6 @@ def delete_member(member_id: int):
 def invalidate_cache(prefix: str = ""):
     """Invalidate API cache (useful for forcing fresh data)."""
     cricket_api.invalidate_cache(prefix)
-    return {"message": f"Cache invalidated{' (prefix: ' + prefix + ')' if prefix else ''}"}
+    return {
+        "message": f"Cache invalidated{' (prefix: ' + prefix + ')' if prefix else ''}"
+    }
