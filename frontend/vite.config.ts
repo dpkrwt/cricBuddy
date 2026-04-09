@@ -7,11 +7,11 @@ export default defineConfig({
   server: {
     port: 3000,
     open: true,
-    // proxy: {
-    //   "/api": {
-    //     target: "https://cricbuddy-backend-6zqb.onrender.com",
-    //     changeOrigin: true,
-    //   },
-    // },
+    proxy: {
+      "/api": {
+        target: "https://cricbuddy-backend-6zqb.onrender.com",
+        changeOrigin: true,
+      },
+    },
   },
 });
