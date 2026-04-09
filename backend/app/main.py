@@ -7,7 +7,7 @@ import logging
 
 from .data import TEAMS, SCHEDULE, MEMBERS
 from .cricket_api import cricket_api
-from .redis_client import redis as redis_db
+from . import database as db
 
 logger = logging.getLogger(__name__)
 
@@ -25,59 +25,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ── Redis-backed members storage ──
-MEMBERS_KEY_PREFIX = "cricbuddy:member:"
-MEMBERS_COUNTER_KEY = "cricbuddy:member_next_id"
-
-
-def _seed_members_if_empty():
-    """Seed default members into Redis if no members exist."""
-    existing = redis_db.keys(f"{MEMBERS_KEY_PREFIX}*")
-    if existing:
-        return
-    logger.info("Seeding default members into Redis")
-    for m in MEMBERS:
-        redis_db.set_json(f"{MEMBERS_KEY_PREFIX}{m['id']}", m)
-    # Set counter to next id after max
-    max_id = max(m["id"] for m in MEMBERS)
-    redis_db.set(MEMBERS_COUNTER_KEY, str(max_id))
-
-
-def _get_all_members() -> list:
-    """Get all members from Redis."""
-    keys = redis_db.keys(f"{MEMBERS_KEY_PREFIX}*")
-    members = []
-    for key in keys:
-        if key == MEMBERS_COUNTER_KEY:
-            continue
-        m = redis_db.get_json(key)
-        if m:
-            members.append(m)
-    members.sort(key=lambda x: x.get("id", 0))
-    return members
-
-
-def _get_member(member_id: int) -> Optional[dict]:
-    return redis_db.get_json(f"{MEMBERS_KEY_PREFIX}{member_id}")
-
-
-def _save_member(member: dict):
-    redis_db.set_json(f"{MEMBERS_KEY_PREFIX}{member['id']}", member)
-
-
-def _delete_member(member_id: int) -> bool:
-    return redis_db.delete(f"{MEMBERS_KEY_PREFIX}{member_id}") > 0
-
-
-def _next_member_id() -> int:
-    return redis_db.incr(MEMBERS_COUNTER_KEY)
-
-
-# Seed on startup
+# ── Initialize PostgreSQL ──
 try:
-    _seed_members_if_empty()
+    db.init_db()
+    db.seed_members(MEMBERS)
 except Exception as e:
-    logger.warning(f"Could not seed members to Redis: {e}")
+    logger.warning(f"Could not initialize database: {e}")
 
 
 class MemberCreate(BaseModel):
@@ -647,7 +600,7 @@ def get_playoffs():
 @app.get("/api/members")
 def get_members():
     tm = _team_map()
-    members = _get_all_members()
+    members = db.get_all_members()
 
     # Enrich with API logos
     api_logo_map = {}
@@ -688,7 +641,7 @@ def get_members():
 
 
 @app.post("/api/members")
-def create_member(member: MemberCreate):
+def create_member_endpoint(member: MemberCreate):
     valid_team_ids = {t["id"] for t in TEAMS}
     for tid in member.topTeams:
         if tid not in valid_team_ids:
@@ -696,27 +649,17 @@ def create_member(member: MemberCreate):
     if len(member.topTeams) > 4:
         raise HTTPException(400, "Maximum 4 teams allowed")
 
-    new_id = _next_member_id()
-    new_member = {
-        "id": new_id,
-        "name": member.name,
-        "avatar": member.avatar,
-        "topTeams": member.topTeams[:4],
-    }
-    _save_member(new_member)
+    new_member = db.create_member(
+        name=member.name,
+        avatar=member.avatar,
+        top_teams=member.topTeams[:4],
+    )
     return new_member
 
 
 @app.put("/api/members/{member_id}")
-def update_member(member_id: int, member: MemberUpdate):
-    existing = _get_member(member_id)
-    if not existing:
-        raise HTTPException(404, "Member not found")
-
-    if member.name is not None:
-        existing["name"] = member.name
-    if member.avatar is not None:
-        existing["avatar"] = member.avatar
+def update_member_endpoint(member_id: int, member: MemberUpdate):
+    valid_top_teams = None
     if member.topTeams is not None:
         valid_team_ids = {t["id"] for t in TEAMS}
         for tid in member.topTeams:
@@ -724,15 +667,22 @@ def update_member(member_id: int, member: MemberUpdate):
                 raise HTTPException(400, f"Invalid team id: {tid}")
         if len(member.topTeams) > 4:
             raise HTTPException(400, "Maximum 4 teams allowed")
-        existing["topTeams"] = member.topTeams[:4]
+        valid_top_teams = member.topTeams[:4]
 
-    _save_member(existing)
-    return existing
+    updated = db.update_member(
+        member_id=member_id,
+        name=member.name,
+        avatar=member.avatar,
+        top_teams=valid_top_teams,
+    )
+    if not updated:
+        raise HTTPException(404, "Member not found")
+    return updated
 
 
 @app.delete("/api/members/{member_id}")
-def delete_member(member_id: int):
-    if _delete_member(member_id):
+def delete_member_endpoint(member_id: int):
+    if db.delete_member(member_id):
         return {"message": "Member deleted"}
     raise HTTPException(404, "Member not found")
 
