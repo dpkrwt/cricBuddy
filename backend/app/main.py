@@ -16,7 +16,7 @@ app = FastAPI(title="CricBuddy API", version="1.0.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://cricbuddy-backend-6zqb.onrender.com",
+        "https://cricbuddy.onrender.com",
         "http://localhost:3000",
         "http://localhost:5173",
     ],
