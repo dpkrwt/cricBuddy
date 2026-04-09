@@ -11,8 +11,8 @@ A full-stack cricket application for IPL T20 match tracking with member manageme
 
 ## Tech Stack
 
-- **Frontend**: React + TypeScript + Chakra UI
-- **Backend**: FastAPI + Python
+- **Frontend**: React + TypeScript + Chakra UI v3
+- **Backend**: FastAPI + Python 3.13 + PostgreSQL 16
 - **Data Source**: Static data (default) or live data from CricketData.org API
 
 ## Setup
@@ -24,7 +24,7 @@ A full-stack cricket application for IPL T20 match tracking with member manageme
 make install
 
 # Or manually:
-cd backend && pip3 install -r requirements.txt
+cd backend && python3.13 -m venv venv && source venv/bin/activate && pip install -r requirements.txt
 cd frontend && npm install
 ```
 
@@ -33,12 +33,14 @@ cd frontend && npm install
 To use live cricket match data:
 
 1. Get a free API key from [CricketData.org](https://cricketdata.org/member.aspx)
+
 2. Create `backend/.env` file:
 
 ```env
 CRICKET_API_KEY=your_api_key_here
 CRICKET_API_BASE_URL=https://api.cricapi.com/v1
 USE_LIVE_DATA=true
+DATABASE_URL=postgresql://localhost:5432/cricbuddy
 ```
 
 Without an API key, the app uses static IPL 2025 mock data.
@@ -92,6 +94,7 @@ cricBuddy/
 │   │   ├── main.py         # FastAPI app & endpoints
 │   │   ├── data.py         # Static IPL data
 │   │   ├── cricket_api.py  # CricketData.org API client
+│   │   ├── database.py     # PostgreSQL member storage (NEW)
 │   │   └── __init__.py
 │   ├── requirements.txt
 │   └── .env.example
@@ -131,9 +134,21 @@ Team logos are generated using [UI Avatars](https://ui-avatars.com/) - a free av
 ## Development Notes
 
 - Frontend runs on port 3000, backend on port 8000
+- Backend uses Python 3.13 and PostgreSQL 16 (no Redis required)
 - Vite proxy configured: `/api` → `http://127.0.0.1:8000`
 - TypeScript strict mode enabled
-- Dark IPL-themed UI with Chakra UI v2
+- Dark IPL-themed UI with Chakra UI v3
+
+## Environment Variables
+
+Add these to your `.env` and `.env.example`:
+
+```env
+CRICKET_API_KEY=your_api_key_here
+CRICKET_API_BASE_URL=https://api.cricapi.com/v1
+USE_LIVE_DATA=true
+DATABASE_URL=postgresql://localhost:5432/cricbuddy
+```
 
 ## License
 
