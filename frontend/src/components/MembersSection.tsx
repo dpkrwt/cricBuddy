@@ -175,9 +175,29 @@ function MembersSection() {
     return row ? row.points : 0;
   };
 
+  // Top 4 team IDs from the actual points table
+  const actualTop4 = pointsTable.slice(0, 4).map((r) => r.teamId);
+
+  const getTeamPredictionScore = (teamId: string, predictedIndex: number) => {
+    const actualIndex = actualTop4.indexOf(teamId);
+    if (actualIndex === -1) return 0; // not in top 4
+    if (actualIndex === predictedIndex) return 25; // exact position match
+    return 10; // in top 4 but wrong position
+  };
+
+  const getTeamPredictionStatus = (
+    teamId: string,
+    predictedIndex: number,
+  ): "exact" | "partial" | "miss" => {
+    const actualIndex = actualTop4.indexOf(teamId);
+    if (actualIndex === -1) return "miss";
+    if (actualIndex === predictedIndex) return "exact";
+    return "partial";
+  };
+
   const getMemberPoints = (member: Member) => {
     return (member.topTeams || []).reduce(
-      (sum, teamId) => sum + getTeamPoints(teamId),
+      (sum, teamId, idx) => sum + getTeamPredictionScore(teamId, idx),
       0,
     );
   };
@@ -258,42 +278,79 @@ function MembersSection() {
             </Flex>
 
             <VStack gap={2} align="stretch">
-              {(member.topTeamsInfo || []).map((team) => (
-                <HStack
-                  key={team.id}
-                  gap={3}
-                  bg="bg.subtle"
-                  px={3}
-                  py={2}
-                  borderRadius="lg"
-                  borderLeft="3px solid"
-                  borderLeftColor={team.color}
-                >
-                  <TeamLogo
-                    src={team.logo}
-                    alt={team.shortName}
-                    size="24px"
-                    bgColor={`${team.color}22`}
-                  />
-                  <Text
-                    fontWeight="600"
-                    fontSize="sm"
-                    flex={1}
-                    color="text.primary"
+              {(member.topTeamsInfo || []).map((team, idx) => {
+                const status = getTeamPredictionStatus(
+                  team.id,
+                  member.topTeams.indexOf(team.id),
+                );
+                const score = getTeamPredictionScore(
+                  team.id,
+                  member.topTeams.indexOf(team.id),
+                );
+                return (
+                  <HStack
+                    key={team.id}
+                    gap={3}
+                    bg="bg.subtle"
+                    px={3}
+                    py={2}
+                    borderRadius="lg"
+                    borderLeft="3px solid"
+                    borderLeftColor={
+                      status === "exact"
+                        ? "green.400"
+                        : status === "partial"
+                          ? "yellow.400"
+                          : team.color
+                    }
                   >
-                    {team.shortName}
-                  </Text>
-                  <Badge
-                    colorPalette={getTeamPoints(team.id) > 0 ? "green" : "gray"}
-                    variant="subtle"
-                    fontSize="10px"
-                    borderRadius="full"
-                    px={2}
-                  >
-                    {getTeamPoints(team.id)}pts
-                  </Badge>
-                </HStack>
-              ))}
+                    <Badge
+                      colorPalette="gray"
+                      variant="subtle"
+                      fontSize="10px"
+                      borderRadius="full"
+                      px={1.5}
+                      minW="20px"
+                      textAlign="center"
+                    >
+                      #{idx + 1}
+                    </Badge>
+                    <TeamLogo
+                      src={team.logo}
+                      alt={team.shortName}
+                      size="24px"
+                      bgColor={`${team.color}22`}
+                    />
+                    <Text
+                      fontWeight="600"
+                      fontSize="sm"
+                      flex={1}
+                      color="text.primary"
+                    >
+                      {team.shortName}
+                    </Text>
+                    <Badge
+                      colorPalette={
+                        status === "exact"
+                          ? "green"
+                          : status === "partial"
+                            ? "yellow"
+                            : "gray"
+                      }
+                      variant="subtle"
+                      fontSize="10px"
+                      borderRadius="full"
+                      px={2}
+                    >
+                      {status === "exact"
+                        ? "✓ 25pts"
+                        : status === "partial"
+                          ? "~ 10pts"
+                          : "0pts"}
+                    </Badge>
+                  </HStack>
+                );
+              })}
               {(member.topTeamsInfo || []).length === 0 && (
                 <Text
                   fontSize="sm"
@@ -408,7 +465,9 @@ function MembersSection() {
                     Top 4 Teams (drag to add &amp; reorder)
                   </Text>
                   <Text fontSize="xs" color="text.muted" mb={3}>
-                    Points are based on team standings in the IPL points table
+                    Predict the top 4 teams in order. Exact position = 25pts, in
+                    top 4 but wrong position = 10pts, not in top 4 = 0pts. Max:
+                    100pts.
                   </Text>
 
                   <DragDropContext onDragEnd={handleDragEnd}>
