@@ -7,6 +7,7 @@ import {
   IconButton,
   VStack,
   Drawer,
+  Badge,
 } from "@chakra-ui/react";
 import { Link, useLocation } from "react-router-dom";
 import { HiMenu } from "react-icons/hi";
@@ -16,8 +17,10 @@ import {
   MdSchedule,
   MdGroups,
   MdClose,
+  MdLogout,
 } from "react-icons/md";
 import { ColorModeButton } from "./ui/color-mode";
+import { useAdmin } from "../context/AdminContext";
 import type { IconType } from "react-icons";
 
 interface NavItem {
@@ -35,6 +38,7 @@ const NAV_ITEMS: NavItem[] = [
 function Navbar() {
   const location = useLocation();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const { isAdmin, logout } = useAdmin();
 
   return (
     <Box
@@ -115,6 +119,23 @@ function Navbar() {
             _hover={{ bg: "bg.card.hover" }}
             display={{ base: "none", md: "flex" }}
           />
+          {isAdmin && (
+            <HStack gap={1} display={{ base: "none", md: "flex" }}>
+              <Badge colorPalette="green" variant="subtle" fontSize="xs">
+                Admin
+              </Badge>
+              <IconButton
+                size="xs"
+                variant="ghost"
+                color="text.muted"
+                _hover={{ color: "red.400" }}
+                onClick={logout}
+                aria-label="Logout"
+              >
+                <MdLogout />
+              </IconButton>
+            </HStack>
+          )}
         </HStack>
 
         <HStack gap={2} display={{ base: "flex", md: "none" }}>
@@ -183,6 +204,24 @@ function Navbar() {
                   );
                 })}
               </VStack>
+              {isAdmin && (
+                <HStack gap={2} px={4} py={3}>
+                  <Badge colorPalette="green" variant="subtle" fontSize="xs">
+                    Admin
+                  </Badge>
+                  <Text
+                    fontSize="sm"
+                    color="red.400"
+                    cursor="pointer"
+                    onClick={() => {
+                      logout();
+                      setDrawerOpen(false);
+                    }}
+                  >
+                    Logout
+                  </Text>
+                </HStack>
+              )}
             </Drawer.Body>
           </Drawer.Content>
         </Drawer.Positioner>

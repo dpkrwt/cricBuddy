@@ -1,9 +1,10 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, List
 import re
 import logging
+import secrets
 
 from .data import TEAMS, SCHEDULE, MEMBERS
 from .cricket_api import cricket_api
@@ -29,6 +30,7 @@ app.add_middleware(
 try:
     db.init_db()
     db.seed_members(MEMBERS)
+    db.seed_admin("deepak@cricbuddy")
 except Exception as e:
     logger.warning(f"Could not initialize database: {e}")
 
@@ -43,6 +45,34 @@ class MemberUpdate(BaseModel):
     name: Optional[str] = None
     avatar: Optional[str] = None
     topTeams: Optional[List[str]] = None
+
+
+class AdminLogin(BaseModel):
+    password: str
+
+
+# ── Admin auth ──
+_admin_tokens: set[str] = set()
+
+
+def _verify_admin(token: str):
+    if token not in _admin_tokens:
+        raise HTTPException(401, "Unauthorized – admin login required")
+
+
+@app.post("/api/admin/login")
+def admin_login(body: AdminLogin):
+    if not db.verify_admin_password(body.password):
+        raise HTTPException(401, "Invalid password")
+    token = secrets.token_hex(32)
+    _admin_tokens.add(token)
+    return {"token": token}
+
+
+@app.post("/api/admin/logout")
+def admin_logout(token: str = ""):
+    _admin_tokens.discard(token)
+    return {"message": "Logged out"}
 
 
 # ── Helpers ──────────────────────────────────────────────────────
@@ -658,7 +688,8 @@ def create_member_endpoint(member: MemberCreate):
 
 
 @app.put("/api/members/{member_id}")
-def update_member_endpoint(member_id: int, member: MemberUpdate):
+def update_member_endpoint(member_id: int, member: MemberUpdate, x_admin_token: str = Header("")):
+    _verify_admin(x_admin_token)
     valid_top_teams = None
     if member.topTeams is not None:
         valid_team_ids = {t["id"] for t in TEAMS}
@@ -681,7 +712,8 @@ def update_member_endpoint(member_id: int, member: MemberUpdate):
 
 
 @app.delete("/api/members/{member_id}")
-def delete_member_endpoint(member_id: int):
+def delete_member_endpoint(member_id: int, x_admin_token: str = Header("")):
+    _verify_admin(x_admin_token)
     if db.delete_member(member_id):
         return {"message": "Member deleted"}
     raise HTTPException(404, "Member not found")

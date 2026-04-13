@@ -37,10 +37,12 @@ import {
 import TeamLogo from "./TeamLogo";
 import type { Member, TeamInfo, PointsTableRow } from "../types";
 import { toaster } from "./ui/toaster";
+import { useAdmin } from "../context/AdminContext";
 
 const AVATARS = ["🏏", "🎯", "⭐", "🔥", "🏆", "💪", "🎪", "🦁"];
 
 function MembersSection() {
+  const { isAdmin, adminToken } = useAdmin();
   const [members, setMembers] = useState<Member[]>([]);
   const [allTeams, setAllTeams] = useState<TeamInfo[]>([]);
   const [pointsTable, setPointsTable] = useState<PointsTableRow[]>([]);
@@ -91,11 +93,15 @@ function MembersSection() {
     }
     try {
       if (editingMember) {
-        await updateMember(editingMember.id, {
-          name: memberName,
-          avatar: memberAvatar,
-          topTeams: selectedTeams,
-        });
+        await updateMember(
+          editingMember.id,
+          {
+            name: memberName,
+            avatar: memberAvatar,
+            topTeams: selectedTeams,
+          },
+          adminToken || undefined,
+        );
         toaster.success({ title: "Member updated!", duration: 2000 });
       } else {
         await createMember({
@@ -119,7 +125,7 @@ function MembersSection() {
 
   const handleDelete = async (id: number) => {
     try {
-      await deleteMember(id);
+      await deleteMember(id, adminToken || undefined);
       toaster.success({ title: "Member removed", duration: 2000 });
       fetchData();
     } catch {
@@ -254,26 +260,30 @@ function MembersSection() {
                 </VStack>
               </HStack>
               <HStack gap={1}>
-                <IconButton
-                  size="xs"
-                  variant="ghost"
-                  color="text.muted"
-                  _hover={{ color: "accent.solid" }}
-                  onClick={() => handleOpenEdit(member)}
-                  aria-label="Edit"
-                >
-                  <MdEdit />
-                </IconButton>
-                <IconButton
-                  size="xs"
-                  variant="ghost"
-                  color="text.muted"
-                  _hover={{ color: "red.400" }}
-                  onClick={() => handleDelete(member.id)}
-                  aria-label="Delete"
-                >
-                  <MdDelete />
-                </IconButton>
+                {isAdmin && (
+                  <>
+                    <IconButton
+                      size="xs"
+                      variant="ghost"
+                      color="text.muted"
+                      _hover={{ color: "accent.solid" }}
+                      onClick={() => handleOpenEdit(member)}
+                      aria-label="Edit"
+                    >
+                      <MdEdit />
+                    </IconButton>
+                    <IconButton
+                      size="xs"
+                      variant="ghost"
+                      color="text.muted"
+                      _hover={{ color: "red.400" }}
+                      onClick={() => handleDelete(member.id)}
+                      aria-label="Delete"
+                    >
+                      <MdDelete />
+                    </IconButton>
+                  </>
+                )}
               </HStack>
             </Flex>
 

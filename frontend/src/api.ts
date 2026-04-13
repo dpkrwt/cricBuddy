@@ -23,8 +23,13 @@ export const getPlayoffs = () => api.get<Match[]>("/playoffs");
 export const getMembers = () => api.get<Member[]>("/members");
 export const createMember = (data: MemberCreate) =>
   api.post<Member>("/members", data);
-export const updateMember = (id: number, data: MemberUpdate) =>
-  api.put<Member>(`/members/${id}`, data);
-export const deleteMember = (id: number) => api.delete(`/members/${id}`);
+export const updateMember = (id: number, data: MemberUpdate, adminToken?: string) =>
+  api.put<Member>(`/members/${id}`, data, {
+    headers: adminToken ? { "X-Admin-Token": adminToken } : {},
+  });
+export const deleteMember = (id: number, adminToken?: string) =>
+  api.delete(`/members/${id}`, {
+    headers: adminToken ? { "X-Admin-Token": adminToken } : {},
+  });
 
 export default api;

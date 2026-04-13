@@ -1,6 +1,7 @@
 """PostgreSQL database module for members storage."""
 import os
 import json
+import hashlib
 import logging
 import psycopg2
 import psycopg2.extras
@@ -18,7 +19,7 @@ def get_connection():
 
 
 def init_db():
-    """Create the members table if it doesn't exist."""
+    """Create the members and admin tables if they don't exist."""
     conn = get_connection()
     try:
         with conn.cursor() as cur:
@@ -28,6 +29,12 @@ def init_db():
                     name TEXT NOT NULL,
                     avatar TEXT NOT NULL DEFAULT '🏏',
                     top_teams JSONB NOT NULL DEFAULT '[]'::jsonb
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS admin (
+                    id SERIAL PRIMARY KEY,
+                    password_hash TEXT NOT NULL
                 )
             """)
         conn.commit()
@@ -171,5 +178,68 @@ def delete_member(member_id: int) -> bool:
             deleted = cur.rowcount > 0
         conn.commit()
         return deleted
+    finally:
+        conn.close()
+
+
+# ── Admin password helpers ──
+
+def _hash_password(password: str) -> str:
+    """Hash a password with SHA-256 + salt."""
+    salt = os.urandom(16)
+    hashed = hashlib.pbkdf2_hmac("sha256", password.encode(), salt, 100_000)
+    return salt.hex() + ":" + hashed.hex()
+
+
+def _verify_password(password: str, stored: str) -> bool:
+    """Verify a password against a stored hash."""
+    salt_hex, hash_hex = stored.split(":")
+    salt = bytes.fromhex(salt_hex)
+    hashed = hashlib.pbkdf2_hmac("sha256", password.encode(), salt, 100_000)
+    return hashed.hex() == hash_hex
+
+
+def seed_admin(default_password: str):
+    """Seed a default admin password if none exists."""
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT COUNT(*) FROM admin")
+            if cur.fetchone()[0] > 0:
+                return
+            cur.execute(
+                "INSERT INTO admin (password_hash) VALUES (%s)",
+                (_hash_password(default_password),),
+            )
+        conn.commit()
+        logger.info("Default admin password seeded")
+    finally:
+        conn.close()
+
+
+def verify_admin_password(password: str) -> bool:
+    """Check password against the stored admin hash."""
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT password_hash FROM admin ORDER BY id LIMIT 1")
+            row = cur.fetchone()
+            if not row:
+                return False
+            return _verify_password(password, row[0])
+    finally:
+        conn.close()
+
+
+def update_admin_password(new_password: str):
+    """Update the admin password."""
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE admin SET password_hash = %s WHERE id = (SELECT id FROM admin ORDER BY id LIMIT 1)",
+                (_hash_password(new_password),),
+            )
+        conn.commit()
     finally:
         conn.close()
