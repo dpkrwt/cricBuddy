@@ -18,8 +18,8 @@ import type { Match, PointsTableRow } from "../types";
 
 function MatchRow({ match }: { match: Match }) {
   const dateObj = match.dateTimeGMT
-    ? new Date(match.dateTimeGMT)
-    : new Date(match.date + "T" + (match.time || "00:00") + ":00");
+    ? new Date(match.dateTimeGMT + "Z")
+    : new Date(match.date + "T" + (match.time || "00:00") + ":00Z");
   const dateStr = dateObj.toLocaleDateString("en-IN", {
     weekday: "short",
     month: "short",
@@ -49,7 +49,7 @@ function MatchRow({ match }: { match: Match }) {
       <HStack justify="space-between" mb={3}>
         <HStack gap={2}>
           <Text fontSize="xs" color="text.muted">
-            {match.matchNo ? `#${match.matchNo}` : ""}
+            {match.matchNo ? `Match ${match.matchNo}` : ""}
           </Text>
           <Badge
             colorPalette={statusColor}
@@ -401,7 +401,15 @@ function Matches() {
             _selected={{ color: "text.primary", bg: "bg.card.hover" }}
             fontSize="sm"
           >
-            Schedule
+            Fixtures
+          </Tabs.Trigger>
+          <Tabs.Trigger
+            value="results"
+            color="text.secondary"
+            _selected={{ color: "text.primary", bg: "bg.card.hover" }}
+            fontSize="sm"
+          >
+            Results
           </Tabs.Trigger>
           <Tabs.Trigger
             value="points"
@@ -423,7 +431,20 @@ function Matches() {
         <Tabs.Content value="schedule" px={0}>
           <VStack gap={3} align="stretch">
             {matches
-              .filter((m) => !m.type)
+              .filter((m) => !m.type && !m.matchEnded)
+              .map((m) => (
+                <MatchRow key={m.id || m.matchNo} match={m} />
+              ))}
+          </VStack>
+        </Tabs.Content>
+        <Tabs.Content value="results" px={0}>
+          <VStack gap={3} align="stretch">
+            {matches
+              .filter((m) => !m.type && m.matchEnded)
+              .sort(
+                (a, b) =>
+                  new Date(b.date).getTime() - new Date(a.date).getTime(),
+              )
               .map((m) => (
                 <MatchRow key={m.id || m.matchNo} match={m} />
               ))}

@@ -4,8 +4,8 @@ import type { Match } from "../../types";
 
 function UpcomingMatchCard({ match }: { match: Match }) {
   const dateObj = match.dateTimeGMT
-    ? new Date(match.dateTimeGMT)
-    : new Date(match.date + "T" + (match.time || "00:00") + ":00");
+    ? new Date(match.dateTimeGMT + "Z")
+    : new Date(match.date + "T" + (match.time || "00:00") + ":00Z");
   const dateStr = dateObj.toLocaleDateString("en-IN", {
     weekday: "short",
     month: "short",
