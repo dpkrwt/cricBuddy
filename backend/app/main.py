@@ -245,24 +245,53 @@ def get_series_matches(series_id: str):
 # ─── Teams ───
 @app.get("/api/teams")
 def get_teams():
-    """Return teams, enriched with API logos when live data is available."""
+    """Return teams, enriched with API logos and squad info when live data is available."""
     if cricket_api.enabled:
+        # Build logo map from ipl_data
+        api_teams = {}
         ipl_data = cricket_api.get_ipl_data()
         if ipl_data and ipl_data.get("teams"):
             api_teams = {t["shortName"].upper(): t for t in ipl_data["teams"]}
+
+        # Build squad map from series_squad keyed by uppercase shortname
+        squad_map = {}
+        squad = cricket_api.get_ipl_squad()
+        if squad:
+            for sq in squad:
+                sq_sn = (sq.get("shortname") or "").upper()
+                if sq_sn:
+                    squad_map[sq_sn] = sq
+
+        if api_teams or squad_map:
             enriched = []
             for t in TEAMS:
                 team = {k: v for k, v in t.items() if k != "players"}
-                # Look up by our shortname, or try known API aliases
                 sn = t["shortName"].upper()
+                aliases = _ID_TO_API_SHORTNAMES.get(t["id"], [])
+
+                # Enrich logo
                 api_t = api_teams.get(sn)
                 if not api_t:
-                    for alias in _ID_TO_API_SHORTNAMES.get(t["id"], []):
+                    for alias in aliases:
                         api_t = api_teams.get(alias)
                         if api_t:
                             break
                 if api_t and api_t.get("img"):
                     team["logo"] = api_t["img"]
+
+                # Enrich with squad image (fallback) and player count
+                sq = squad_map.get(sn)
+                if not sq:
+                    for alias in aliases:
+                        sq = squad_map.get(alias)
+                        if sq:
+                            break
+                if sq:
+                    if not team.get("logo") or "ui-avatars" in team.get("logo", ""):
+                        if sq.get("img"):
+                            team["logo"] = sq["img"]
+                    team["playerCount"] = len(sq.get("players", []))
+
                 enriched.append(team)
             return enriched
 
@@ -273,17 +302,46 @@ def get_teams():
 def get_team(team_id: str):
     for t in TEAMS:
         if t["id"] == team_id:
-            # Enrich with API logo if available
+            team = {**t}
             if cricket_api.enabled:
+                # Enrich with API logo
                 ipl_data = cricket_api.get_ipl_data()
                 if ipl_data and ipl_data.get("teams"):
                     api_teams = {
                         at["shortName"].upper(): at for at in ipl_data["teams"]
                     }
-                    api_t = api_teams.get(t["shortName"].upper())
+                    sn = t["shortName"].upper()
+                    api_t = api_teams.get(sn)
+                    if not api_t:
+                        for alias in _ID_TO_API_SHORTNAMES.get(t["id"], []):
+                            api_t = api_teams.get(alias)
+                            if api_t:
+                                break
                     if api_t and api_t.get("img"):
-                        return {**t, "logo": api_t["img"]}
-            return t
+                        team["logo"] = api_t["img"]
+
+                # Enrich players from series squad
+                squad = cricket_api.get_ipl_squad()
+                if squad:
+                    sn_upper = t["shortName"].upper()
+                    aliases = _ID_TO_API_SHORTNAMES.get(t["id"], [])
+                    for squad_team in squad:
+                        api_sn = (squad_team.get("shortname") or "").upper()
+                        if api_sn == sn_upper or api_sn in aliases:
+                            team["players"] = [
+                                {
+                                    "id": p.get("id", ""),
+                                    "name": p.get("name", ""),
+                                    "role": p.get("role", ""),
+                                    "battingStyle": p.get("battingStyle", ""),
+                                    "bowlingStyle": p.get("bowlingStyle", ""),
+                                    "country": p.get("country", ""),
+                                    "playerImg": p.get("playerImg", ""),
+                                }
+                                for p in squad_team.get("players", [])
+                            ]
+                            break
+            return team
     raise HTTPException(404, "Team not found")
 
 
@@ -688,7 +746,9 @@ def create_member_endpoint(member: MemberCreate):
 
 
 @app.put("/api/members/{member_id}")
-def update_member_endpoint(member_id: int, member: MemberUpdate, x_admin_token: str = Header("")):
+def update_member_endpoint(
+    member_id: int, member: MemberUpdate, x_admin_token: str = Header("")
+):
     _verify_admin(x_admin_token)
     valid_top_teams = None
     if member.topTeams is not None:

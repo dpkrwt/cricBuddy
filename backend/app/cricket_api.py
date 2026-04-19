@@ -287,7 +287,43 @@ class CricketAPI:
         return result
 
     # ──────────────────────────────────────────────────────────
-    # 6. HIGH-LEVEL: fetch everything for latest IPL
+    # 6. SERIES SQUAD
+    # ──────────────────────────────────────────────────────────
+    def get_series_squad(self, series_id: str) -> Optional[List[Dict[str, Any]]]:
+        """Fetch squad list for all teams in a series."""
+        cache_key = f"series_squad:{series_id}"
+        cached = _cache.get(cache_key)
+        if cached is not None:
+            return cached
+
+        data = self._get("series_squad", {"id": series_id})
+        if not data:
+            return None
+        result = data.get("data", [])
+        _cache.set(cache_key, result, MATCHES_CACHE_TTL)
+        return result
+
+    def get_ipl_squad(self) -> Optional[List[Dict[str, Any]]]:
+        """Fetch squad data for the latest IPL series."""
+        cache_key = "ipl_squad"
+        cached = _cache.get(cache_key)
+        if cached is not None:
+            return cached
+
+        series = self.get_latest_ipl_series()
+        if not series:
+            return None
+        series_id = series.get("id")
+        if not series_id:
+            return None
+
+        squad = self.get_series_squad(series_id)
+        if squad is not None:
+            _cache.set(cache_key, squad, MATCHES_CACHE_TTL)
+        return squad
+
+    # ──────────────────────────────────────────────────────────
+    # 7. HIGH-LEVEL: fetch everything for latest IPL
     # ──────────────────────────────────────────────────────────
     def get_ipl_data(self) -> Optional[Dict[str, Any]]:
         """

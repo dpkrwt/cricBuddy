@@ -13,9 +13,13 @@ export interface Team extends TeamInfo {
 }
 
 export interface Player {
+  id?: string;
   name: string;
   role: string;
   country: string;
+  battingStyle?: string;
+  bowlingStyle?: string;
+  playerImg?: string;
 }
 
 export interface LiveDetail {

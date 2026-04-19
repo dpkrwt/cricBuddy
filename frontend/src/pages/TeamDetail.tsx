@@ -12,6 +12,7 @@ import {
   SimpleGrid,
   Breadcrumb,
   Flex,
+  Image,
 } from "@chakra-ui/react";
 import { MdArrowBack } from "react-icons/md";
 import { getTeam } from "../api";
@@ -124,7 +125,7 @@ function TeamDetail() {
       <SimpleGrid columns={{ base: 1, sm: 2, md: 3, lg: 4 }} gap={4}>
         {team.players?.map((player, idx) => (
           <Box
-            key={idx}
+            key={player.id || idx}
             bg="bg.card"
             borderRadius="xl"
             p={5}
@@ -136,27 +137,52 @@ function TeamDetail() {
             }}
             transition="all 0.2s"
           >
-            <VStack gap={2} align="start">
-              <HStack justify="space-between" w="full">
+            <HStack gap={3} align="start">
+              {player.playerImg && (
+                <Image
+                  src={player.playerImg}
+                  alt={player.name}
+                  boxSize="48px"
+                  borderRadius="full"
+                  objectFit="cover"
+                  flexShrink={0}
+                  bg={`${team.color}22`}
+                />
+              )}
+              <VStack gap={2} align="start" flex={1}>
                 <Text fontWeight="700" fontSize="md" color="text.primary">
                   {player.name}
                 </Text>
-              </HStack>
-              <HStack gap={2}>
-                <Badge
-                  colorPalette={roleColors[player.role] || "gray"}
-                  variant="subtle"
-                  fontSize="xs"
-                  borderRadius="full"
-                  px={2}
-                >
-                  {player.role}
-                </Badge>
-                <Text fontSize="xs" color="text.muted">
-                  {player.country === "India" ? "🇮🇳" : "🌍"} {player.country}
-                </Text>
-              </HStack>
-            </VStack>
+                <HStack gap={2} flexWrap="wrap">
+                  <Badge
+                    colorPalette={roleColors[player.role] || "gray"}
+                    variant="subtle"
+                    fontSize="xs"
+                    borderRadius="full"
+                    px={2}
+                  >
+                    {player.role}
+                  </Badge>
+                  <Text fontSize="xs" color="text.muted">
+                    {player.country === "India" ? "🇮🇳" : "🌍"} {player.country}
+                  </Text>
+                </HStack>
+                {(player.battingStyle || player.bowlingStyle) && (
+                  <VStack gap={0} align="start">
+                    {player.battingStyle && (
+                      <Text fontSize="xs" color="text.muted">
+                        🏏 {player.battingStyle}
+                      </Text>
+                    )}
+                    {player.bowlingStyle && (
+                      <Text fontSize="xs" color="text.muted">
+                        🎳 {player.bowlingStyle}
+                      </Text>
+                    )}
+                  </VStack>
+                )}
+              </VStack>
+            </HStack>
           </Box>
         ))}
       </SimpleGrid>
